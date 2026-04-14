@@ -88,6 +88,7 @@ const App = () => {
     if (pendingClear) {
       setItems([]);
       setPendingClear(false);
+      window.location.reload();
     } else {
       setPendingClear(true);
       setTimeout(() => setPendingClear(false), 3000);
