@@ -221,7 +221,7 @@ const App = () => {
                 >
                   <button
                     onClick={() => addFromHistory(name)}
-                    className="pl-3 pr-1 py-1.5 text-xs text-stone-600 group-hover:text-orange-600 font-medium"
+                    className="pl-3 pr-1 py-1.5 text-sm text-stone-600 group-hover:text-orange-600 font-medium"
                   >
                     {name}
                   </button>
