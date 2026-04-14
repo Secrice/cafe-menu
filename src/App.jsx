@@ -11,13 +11,27 @@ const App = () => {
     }
   });
 
+  const [history, setHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('menuHistory');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [editingId, setEditingId] = useState(null);
   const [pendingClear, setPendingClear] = useState(false);
+  const [pendingHistoryClear, setPendingHistoryClear] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem('menuItems', JSON.stringify(items));
   }, [items]);
+
+  useEffect(() => {
+    localStorage.setItem('menuHistory', JSON.stringify(history));
+  }, [history]);
 
   useEffect(() => {
     if (editingId && inputRef.current) {
@@ -36,10 +50,40 @@ const App = () => {
     setEditingId(newItem.id);
   };
 
+  const addFromHistory = (name) => {
+    const existingItem = items.find(item => item.name === name);
+    if (existingItem) {
+      updateCount(existingItem.id, 1);
+      return;
+    }
+    const newItem = { id: crypto.randomUUID(), name, count: 1 };
+    setItems([...items, newItem]);
+  };
+
+  const removeFromHistory = (e, name) => {
+    e.stopPropagation();
+    setHistory(prev => prev.filter(h => h !== name));
+  };
+
   const finishEditing = (id, newName) => {
-    const trimmedName = newName.trim() || '이름 없음';
+    const trimmedName = newName.trim();
+
+    if (!trimmedName) {
+      const item = items.find(i => i.id === id);
+      if (item && !item.name) {
+        setItems(items.filter(i => i.id !== id));
+      }
+      setEditingId(null);
+      return;
+    }
+
     setItems(items.map(item => (item.id === id ? { ...item, name: trimmedName } : item)));
     setEditingId(null);
+
+    setHistory(prev => {
+      const filtered = prev.filter(h => h !== trimmedName);
+      return [trimmedName, ...filtered].slice(0, 15);
+    });
   };
 
   const updateCount = (id, delta) => {
@@ -64,11 +108,21 @@ const App = () => {
     }
   };
 
+  const handleHistoryClearClick = () => {
+    if (pendingHistoryClear) {
+      setHistory([]);
+      setPendingHistoryClear(false);
+    } else {
+      setPendingHistoryClear(true);
+      setTimeout(() => setPendingHistoryClear(false), 3000);
+    }
+  };
+
   const totalTypes = items.length;
   const totalCount = items.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 pb-32">
+    <div className="min-h-screen bg-white text-gray-900 pb-40">
       <header className="p-4 border-b sticky top-0 bg-white/80 backdrop-blur-sm z-10 flex justify-between items-center">
         <h1 className="text-xl font-bold text-blue-600">메뉴 리스트</h1>
       </header>
@@ -147,6 +201,46 @@ const App = () => {
             새 메뉴 추가
           </button>
         </div>
+
+        {history.length > 0 && (
+          <div className="px-4 pb-10">
+            <div className="flex justify-between items-center mb-3 ml-1">
+              <h2 className="text-sm font-semibold text-gray-400">최근 사용한 메뉴</h2>
+              <button
+                onClick={handleHistoryClearClick}
+                className={`text-xs transition-colors ${
+                  pendingHistoryClear
+                    ? 'text-red-500 font-semibold'
+                    : 'text-gray-300 hover:text-red-400'
+                }`}
+              >
+                {pendingHistoryClear ? '한 번 더 누르면 삭제' : '전체 기록 삭제'}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {history.map((name, index) => (
+                <div
+                  key={index}
+                  className="group flex items-center bg-gray-50 border border-gray-100 rounded-full hover:bg-blue-50 hover:border-blue-200 transition-all active:scale-95"
+                >
+                  <button
+                    onClick={() => addFromHistory(name)}
+                    className="pl-3 pr-1 py-1.5 text-sm text-gray-600 group-hover:text-blue-600 font-medium"
+                  >
+                    {name}
+                  </button>
+                  <button
+                    onClick={(e) => removeFromHistory(e, name)}
+                    className="pr-2 pl-1 py-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                    title="히스토리에서 삭제"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-20">
