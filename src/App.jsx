@@ -111,8 +111,18 @@ const App = () => {
   return (
     <div className="min-h-screen bg-stone-50 text-stone-800 pb-40">
       {/* 헤더 */}
-      <header className="px-5 py-4 border-b border-stone-200 sticky top-0 bg-stone-50/90 backdrop-blur-sm z-10">
+      <header className="px-5 py-4 border-b border-stone-200 sticky top-0 bg-stone-50/90 backdrop-blur-sm z-10 flex justify-between items-center">
         <h1 className="text-lg font-semibold tracking-tight text-stone-800">메뉴 리스트</h1>
+        <button
+          onClick={handleClearClick}
+          className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all ${
+            pendingClear
+              ? 'bg-red-500 text-white'
+              : 'text-stone-400 hover:bg-stone-100 hover:text-stone-600'
+          }`}
+        >
+          {pendingClear ? '한 번 더 누르면 초기화' : '전체 초기화'}
+        </button>
       </header>
 
       <main className="max-w-2xl mx-auto">
@@ -241,24 +251,12 @@ const App = () => {
 
       {/* 하단 바 */}
       <footer className="fixed bottom-0 left-0 right-0 bg-stone-50/95 backdrop-blur-sm border-t border-stone-200 z-20">
-        <div className="max-w-2xl mx-auto px-5 py-3.5 pb-safe flex items-center justify-between">
-          <div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-bold text-stone-800">{totalCount}</span>
-              <span className="text-sm text-stone-400">개</span>
-              <span className="text-xs text-stone-300 ml-1">{totalTypes}종류</span>
-            </div>
+        <div className="max-w-2xl mx-auto px-5 py-3.5 pb-safe flex flex-col items-center">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-stone-800">{totalCount}</span>
+            <span className="text-sm text-stone-400">개</span>
+            <span className="text-xs text-stone-300 ml-1">{totalTypes}종류</span>
           </div>
-          <button
-            onClick={handleClearClick}
-            className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all ${
-              pendingClear
-                ? 'bg-red-500 text-white'
-                : 'text-stone-400 hover:bg-stone-100 hover:text-stone-600'
-            }`}
-          >
-            {pendingClear ? '한 번 더 누르면 초기화' : '전체 초기화'}
-          </button>
         </div>
       </footer>
     </div>
