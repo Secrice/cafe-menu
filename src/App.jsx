@@ -14,7 +14,9 @@ const App = () => {
   const [history, setHistory] = useState(() => {
     try {
       const saved = localStorage.getItem('menuHistory');
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return parsed.map(h => typeof h === 'string' ? { name: h, temp: null } : h);
     } catch {
       return [];
     }
@@ -42,39 +44,44 @@ const App = () => {
   }, [editingId]);
 
   const addItem = () => {
-    const newItem = { id: crypto.randomUUID(), name: '', count: 1 };
+    const newItem = { id: crypto.randomUUID(), name: '', count: 1, temp: null };
     setItems([...items, newItem]);
     setEditingId(newItem.id);
   };
 
-  const addFromHistory = (name) => {
-    const existingItem = items.find(item => item.name === name);
+  const addFromHistory = ({ name, temp }) => {
+    const existingItem = items.find(item => item.name === name && item.temp === temp);
     if (existingItem) {
       triggerPop(existingItem.id);
       updateCount(existingItem.id, 1);
       return;
     }
-    setItems([...items, { id: crypto.randomUUID(), name, count: 1 }]);
+    setItems([...items, { id: crypto.randomUUID(), name, count: 1, temp }]);
   };
 
-  const removeFromHistory = (e, name) => {
+  const setTempForItem = (id, value) => {
+    setItems(items.map(i => i.id === id ? { ...i, temp: i.temp === value ? null : value } : i));
+  };
+
+  const removeFromHistory = (e, index) => {
     e.stopPropagation();
-    setHistory(prev => prev.filter(h => h !== name));
+    setHistory(prev => prev.filter((_, i) => i !== index));
   };
 
   const finishEditing = (id, newName) => {
     const trimmedName = newName.trim();
+    const item = items.find(i => i.id === id);
     if (!trimmedName) {
-      const item = items.find(i => i.id === id);
       if (item && !item.name) setItems(items.filter(i => i.id !== id));
       setEditingId(null);
       return;
     }
-    setItems(items.map(item => (item.id === id ? { ...item, name: trimmedName } : item)));
+    setItems(items.map(i => (i.id === id ? { ...i, name: trimmedName } : i)));
     setEditingId(null);
+    const temp = item?.temp ?? null;
     setHistory(prev => {
-      const filtered = prev.filter(h => h !== trimmedName);
-      return [trimmedName, ...filtered].slice(0, 15);
+      const filtered = prev.filter(h => !(h.name === trimmedName && h.temp === temp));
+      return [{ name: trimmedName, temp }, ...filtered].slice(0, 15);
     });
   };
 
@@ -190,7 +197,7 @@ const App = () => {
                 style={{
                   animationDelay: `${i * 0.04}s`,
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: editingId === item.id ? 'flex-start' : 'center',
                   padding: '0.875rem 1.25rem',
                   borderBottom: '1px solid var(--paper-border)',
                   backgroundColor: 'transparent',
@@ -215,29 +222,54 @@ const App = () => {
                 {/* 이름 */}
                 <div style={{ flex: 1, minWidth: 0, marginRight: '1rem' }}>
                   {editingId === item.id ? (
-                    <input
-                      key={item.id}
-                      ref={inputRef}
-                      type="text"
-                      defaultValue={item.name}
-                      onBlur={e => finishEditing(item.id, e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') finishEditing(item.id, e.target.value);
-                      }}
-                      style={{
-                        width: '100%',
-                        border: 'none',
-                        borderBottom: '1.5px solid var(--terracotta)',
-                        outline: 'none',
-                        padding: '0.125rem 0',
-                        fontSize: '1rem',
-                        fontWeight: 500,
-                        fontFamily: 'var(--font-sans)',
-                        backgroundColor: 'transparent',
-                        color: 'var(--warm-text)',
-                      }}
-                      placeholder="메뉴 이름"
-                    />
+                    <div>
+                      <input
+                        key={item.id}
+                        ref={inputRef}
+                        type="text"
+                        defaultValue={item.name}
+                        onBlur={e => finishEditing(item.id, e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') finishEditing(item.id, e.target.value);
+                        }}
+                        style={{
+                          width: '100%',
+                          border: 'none',
+                          borderBottom: '1.5px solid var(--terracotta)',
+                          outline: 'none',
+                          padding: '0.125rem 0',
+                          fontSize: '1rem',
+                          fontWeight: 500,
+                          fontFamily: 'var(--font-sans)',
+                          backgroundColor: 'transparent',
+                          color: 'var(--warm-text)',
+                        }}
+                        placeholder="메뉴 이름"
+                      />
+                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
+                        {[['hot', 'HOT', '#e84040'], ['ice', 'ICE', '#3b82f6']].map(([val, label, color]) => (
+                          <button
+                            key={val}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => setTempForItem(item.id, val)}
+                            style={{
+                              padding: '0.2rem 0.65rem',
+                              borderRadius: '0.25rem',
+                              border: `1.5px solid ${item.temp === val ? color : 'var(--paper-border)'}`,
+                              backgroundColor: item.temp === val ? color : 'transparent',
+                              color: item.temp === val ? 'white' : 'var(--warm-mid)',
+                              fontSize: '0.65rem',
+                              fontWeight: 700,
+                              letterSpacing: '0.06em',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ) : (
                     <div
                       onClick={() => setEditingId(item.id)}
@@ -246,13 +278,31 @@ const App = () => {
                         fontWeight: 400,
                         fontFamily: item.name ? 'var(--font-handwriting)' : 'var(--font-sans)',
                         cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
                         color: item.name ? 'var(--warm-text)' : 'var(--warm-faint)',
                       }}
                     >
-                      {item.name || '이름을 입력하세요'}
+                      {item.temp && (
+                        <span style={{
+                          fontSize: '0.6rem',
+                          fontWeight: 700,
+                          padding: '0.1rem 0.35rem',
+                          borderRadius: '0.25rem',
+                          backgroundColor: item.temp === 'hot' ? '#e84040' : '#3b82f6',
+                          color: 'white',
+                          marginRight: '0.5rem',
+                          letterSpacing: '0.05em',
+                          flexShrink: 0,
+                          fontFamily: 'var(--font-sans)',
+                        }}>
+                          {item.temp === 'hot' ? 'HOT' : 'ICE'}
+                        </span>
+                      )}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.name || '이름을 입력하세요'}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -409,7 +459,7 @@ const App = () => {
                 </button>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {history.map((name, index) => (
+                {history.map((entry, index) => (
                   <div
                     key={index}
                     style={{
@@ -430,7 +480,7 @@ const App = () => {
                     }}
                   >
                     <button
-                      onClick={() => addFromHistory(name)}
+                      onClick={() => addFromHistory(entry)}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
                         padding: '0.3rem 0.5rem 0.3rem 0.75rem',
@@ -438,12 +488,27 @@ const App = () => {
                         fontSize: '0.8rem',
                         fontWeight: 400,
                         color: 'var(--warm-text)',
+                        display: 'flex', alignItems: 'center', gap: '0.35rem',
                       }}
                     >
-                      {name}
+                      {entry.temp && (
+                        <span style={{
+                          fontSize: '0.55rem',
+                          fontWeight: 700,
+                          padding: '0.08rem 0.3rem',
+                          borderRadius: '0.2rem',
+                          backgroundColor: entry.temp === 'hot' ? '#e84040' : '#3b82f6',
+                          color: 'white',
+                          letterSpacing: '0.05em',
+                          lineHeight: 1.4,
+                        }}>
+                          {entry.temp === 'hot' ? 'HOT' : 'ICE'}
+                        </span>
+                      )}
+                      {entry.name}
                     </button>
                     <button
-                      onClick={(e) => removeFromHistory(e, name)}
+                      onClick={(e) => removeFromHistory(e, index)}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
                         padding: '0.3rem 0.5rem 0.3rem 0.125rem',
