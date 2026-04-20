@@ -23,6 +23,7 @@ const App = () => {
   const [editingId, setEditingId] = useState(null);
   const [pendingClear, setPendingClear] = useState(false);
   const [pendingHistoryClear, setPendingHistoryClear] = useState(false);
+  const [poppingId, setPoppingId] = useState(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -49,6 +50,7 @@ const App = () => {
   const addFromHistory = (name) => {
     const existingItem = items.find(item => item.name === name);
     if (existingItem) {
+      triggerPop(existingItem.id);
       updateCount(existingItem.id, 1);
       return;
     }
@@ -76,7 +78,13 @@ const App = () => {
     });
   };
 
+  const triggerPop = (id) => {
+    setPoppingId(id);
+    setTimeout(() => setPoppingId(null), 300);
+  };
+
   const updateCount = (id, delta) => {
+    triggerPop(id);
     setItems(items.map(item =>
       item.id === id ? { ...item, count: Math.max(1, item.count + delta) } : item
     ));
@@ -109,38 +117,103 @@ const App = () => {
   const totalCount = items.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900 pb-40">
+    <div style={{ minHeight: '100svh', backgroundColor: 'var(--cream)', paddingBottom: '7rem' }}>
+
       {/* 헤더 */}
-      <header className="px-5 py-4 sticky top-0 bg-orange-500 z-10 flex justify-between items-center">
-        <h1 className="text-lg font-semibold tracking-tight text-white">메뉴 리스트</h1>
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 10,
+        backgroundColor: 'var(--espresso)',
+        padding: '0 1.25rem',
+        height: '3.5rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottom: '1px solid var(--espresso-light)',
+      }}>
+        <h1 style={{
+          fontFamily: 'var(--font-myeongjo)',
+          fontStyle: 'normal',
+          fontSize: '1.25rem',
+          fontWeight: 700,
+          color: 'var(--cream)',
+          letterSpacing: '0.04em',
+          lineHeight: 1,
+        }}>
+          메뉴 리스트
+        </h1>
         <button
           onClick={handleClearClick}
-          className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all ${
-            pendingClear
-              ? 'bg-red-600 text-white'
-              : 'text-orange-100 hover:bg-orange-600 hover:text-white'
-          }`}
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: '0.7rem',
+            fontWeight: 500,
+            letterSpacing: '0.08em',
+            padding: '0.35rem 0.75rem',
+            borderRadius: '2rem',
+            border: pendingClear ? '1px solid #ef4444' : '1px solid rgba(245,237,214,0.2)',
+            color: pendingClear ? '#fca5a5' : 'var(--warm-faint)',
+            backgroundColor: pendingClear ? 'rgba(239,68,68,0.12)' : 'transparent',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            whiteSpace: 'nowrap',
+          }}
         >
           {pendingClear ? '한 번 더 누르면 초기화' : '전체 초기화'}
         </button>
       </header>
 
-      <main className="max-w-2xl mx-auto">
+      <main style={{ maxWidth: '40rem', margin: '0 auto' }}>
+
+        {/* 구분선 — 항목 있을 때만 */}
+        {items.length > 0 && (
+          <div style={{ borderBottom: '1px solid var(--paper-border)' }} />
+        )}
+
+        {/* 아이템 리스트 */}
         {items.length === 0 ? (
-          <div className="py-24 text-center text-stone-500 text-sm">
-            등록된 메뉴가 없습니다.
+          <div style={{
+            padding: '5rem 1.25rem',
+            textAlign: 'center',
+            color: 'var(--warm-faint)',
+            fontFamily: 'var(--font-serif)',
+            fontStyle: 'italic',
+            fontSize: '1.1rem',
+          }}>
+            아직 메뉴가 없습니다
           </div>
         ) : (
-          <ul>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {items.map((item, i) => (
               <li
                 key={item.id}
-                className={`flex items-center px-5 py-3.5 hover:bg-stone-100 transition-colors ${
-                  i !== 0 ? 'border-t border-stone-200' : ''
-                }`}
+                className="menu-item"
+                style={{
+                  animationDelay: `${i * 0.04}s`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0.875rem 1.25rem',
+                  borderBottom: '1px solid var(--paper-border)',
+                  backgroundColor: 'transparent',
+                  transition: 'background-color 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--cream-dark)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
               >
+                {/* 순번 */}
+                <span style={{
+                  fontFamily: 'var(--font-serif)',
+                  fontStyle: 'italic',
+                  fontSize: '0.8rem',
+                  color: 'var(--warm-faint)',
+                  width: '1.5rem',
+                  flexShrink: 0,
+                  marginRight: '0.75rem',
+                }}>
+                  {i + 1}
+                </span>
+
                 {/* 이름 */}
-                <div className="flex-1 min-w-0 mr-4">
+                <div style={{ flex: 1, minWidth: 0, marginRight: '1rem' }}>
                   {editingId === item.id ? (
                     <input
                       key={item.id}
@@ -151,36 +224,94 @@ const App = () => {
                       onKeyDown={e => {
                         if (e.key === 'Enter') finishEditing(item.id, e.target.value);
                       }}
-                      className="w-full border-b border-orange-400 outline-none py-0.5 text-base font-semibold bg-transparent text-stone-900 placeholder:text-stone-500"
-                      placeholder="메뉴 이름 입력"
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        borderBottom: '1.5px solid var(--terracotta)',
+                        outline: 'none',
+                        padding: '0.125rem 0',
+                        fontSize: '1rem',
+                        fontWeight: 500,
+                        fontFamily: 'var(--font-sans)',
+                        backgroundColor: 'transparent',
+                        color: 'var(--warm-text)',
+                      }}
+                      placeholder="메뉴 이름"
                     />
                   ) : (
                     <div
                       onClick={() => setEditingId(item.id)}
-                      className="text-base font-semibold cursor-pointer truncate text-stone-900"
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: 400,
+                        fontFamily: item.name ? 'var(--font-handwriting)' : 'var(--font-sans)',
+                        cursor: 'pointer',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        color: item.name ? 'var(--warm-text)' : 'var(--warm-faint)',
+                      }}
                     >
-                      {item.name || (
-                        <span className="text-stone-500 font-normal">이름을 입력하세요</span>
-                      )}
+                      {item.name || '이름을 입력하세요'}
                     </div>
                   )}
                 </div>
 
                 {/* 수량 조절 */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="flex items-center gap-1 bg-stone-200 rounded-lg px-1 py-1">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.125rem',
+                    border: '1px solid var(--paper-border)',
+                    borderRadius: '0.5rem',
+                    overflow: 'hidden',
+                    backgroundColor: 'rgba(255,255,255,0.5)',
+                  }}>
                     <button
                       onClick={() => updateCount(item.id, -1)}
-                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-stone-100 active:bg-stone-300 transition-colors text-stone-700 font-semibold text-base"
+                      style={{
+                        width: '2rem', height: '2rem',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--warm-mid)',
+                        fontSize: '1rem',
+                        fontWeight: 300,
+                        transition: 'background-color 0.1s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--cream-dark)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       −
                     </button>
-                    <span className="w-8 text-center text-sm font-bold text-orange-600">
+                    <span
+                      key={poppingId === item.id ? 'pop' : 'still'}
+                      className={poppingId === item.id ? 'count-pop' : ''}
+                      style={{
+                        width: '2rem',
+                        textAlign: 'center',
+                        fontFamily: 'var(--font-serif)',
+                        fontSize: '1.1rem',
+                        fontWeight: 600,
+                        color: 'var(--terracotta)',
+                        lineHeight: '2rem',
+                      }}
+                    >
                       {item.count}
                     </span>
                     <button
                       onClick={() => updateCount(item.id, 1)}
-                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-stone-100 active:bg-stone-300 transition-colors text-stone-700 font-semibold text-base"
+                      style={{
+                        width: '2rem', height: '2rem',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--warm-mid)',
+                        fontSize: '1rem',
+                        fontWeight: 300,
+                        transition: 'background-color 0.1s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--cream-dark)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       +
                     </button>
@@ -188,10 +319,19 @@ const App = () => {
 
                   <button
                     onClick={() => removeItem(item.id)}
-                    className="p-1.5 text-stone-400 hover:text-red-500 transition-colors rounded-md hover:bg-red-50"
                     title="삭제"
+                    style={{
+                      width: '1.75rem', height: '1.75rem',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--warm-faint)',
+                      borderRadius: '0.375rem',
+                      transition: 'color 0.15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--warm-faint)'}
                   >
-                    <X className="h-4 w-4" />
+                    <X size={14} />
                   </button>
                 </div>
               </li>
@@ -199,49 +339,122 @@ const App = () => {
           </ul>
         )}
 
-        {/* 메뉴 추가 버튼 */}
-        <div className="px-5 py-4">
+        {/* 새 메뉴 추가 버튼 */}
+        <div style={{ padding: '1rem 1.25rem' }}>
           <button
             onClick={addItem}
-            className="w-full py-3.5 border border-dashed border-stone-400 rounded-xl text-stone-500 hover:border-orange-400 hover:text-orange-600 hover:bg-orange-50/50 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+            style={{
+              width: '100%',
+              padding: '0.875rem',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+              background: 'none',
+              border: '1px dashed var(--paper-border)',
+              borderRadius: '0.75rem',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              fontSize: '0.875rem',
+              fontWeight: 400,
+              color: 'var(--warm-mid)',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = 'var(--terracotta)';
+              e.currentTarget.style.color = 'var(--terracotta)';
+              e.currentTarget.style.backgroundColor = 'rgba(196,98,45,0.04)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = 'var(--paper-border)';
+              e.currentTarget.style.color = 'var(--warm-mid)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
-            <Plus className="h-4 w-4" />
+            <Plus size={15} />
             새 메뉴 추가
           </button>
         </div>
 
         {/* 히스토리 */}
         {history.length > 0 && (
-          <div className="px-5 pb-10">
-            <div className="bg-stone-100/80 rounded-xl p-4">
-              <div className="flex justify-between items-center mb-3">
-                <h2 className="text-xs font-semibold text-stone-600 uppercase tracking-wider">최근 사용</h2>
+          <div style={{ padding: '0 1.25rem 3rem' }}>
+            <div style={{
+              borderTop: '1px solid var(--paper-border)',
+              paddingTop: '1rem',
+            }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: '0.75rem',
+              }}>
+                <h2 style={{
+                  fontFamily: 'var(--font-myeongjo)',
+                  fontStyle: 'normal',
+                  fontSize: '0.85rem',
+                  color: 'var(--warm-faint)',
+                  margin: 0,
+                  fontWeight: 400,
+                }}>
+                  최근 사용
+                </h2>
                 <button
                   onClick={handleHistoryClearClick}
-                  className={`text-xs transition-colors ${
-                    pendingHistoryClear ? 'text-red-500 font-medium' : 'text-stone-400 hover:text-red-500'
-                  }`}
+                  style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '0.7rem',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: pendingHistoryClear ? '#ef4444' : 'var(--warm-faint)',
+                    transition: 'color 0.15s',
+                    padding: 0,
+                  }}
                 >
                   {pendingHistoryClear ? '한 번 더 누르면 삭제' : '전체 삭제'}
                 </button>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                 {history.map((name, index) => (
                   <div
                     key={index}
-                    className="group flex items-center bg-white border border-stone-300 rounded-full shadow-sm hover:border-orange-300 hover:bg-orange-50 transition-all active:scale-95"
+                    style={{
+                      display: 'flex', alignItems: 'center',
+                      border: '1px solid var(--paper-border)',
+                      borderRadius: '2rem',
+                      backgroundColor: 'rgba(255,255,255,0.6)',
+                      overflow: 'hidden',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = 'var(--terracotta-light)';
+                      e.currentTarget.style.backgroundColor = 'rgba(196,98,45,0.06)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = 'var(--paper-border)';
+                      e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.6)';
+                    }}
                   >
                     <button
                       onClick={() => addFromHistory(name)}
-                      className="pl-3 pr-1 py-1.5 text-sm text-stone-700 group-hover:text-orange-600 font-medium"
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        padding: '0.3rem 0.5rem 0.3rem 0.75rem',
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: '0.8rem',
+                        fontWeight: 400,
+                        color: 'var(--warm-text)',
+                      }}
                     >
                       {name}
                     </button>
                     <button
                       onClick={(e) => removeFromHistory(e, name)}
-                      className="pr-2 pl-0.5 py-1.5 text-stone-400 hover:text-red-500 transition-colors"
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        padding: '0.3rem 0.5rem 0.3rem 0.125rem',
+                        color: 'var(--warm-faint)',
+                        display: 'flex', alignItems: 'center',
+                        transition: 'color 0.15s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--warm-faint)'}
                     >
-                      <X className="h-3 w-3" />
+                      <X size={10} />
                     </button>
                   </div>
                 ))}
@@ -252,13 +465,50 @@ const App = () => {
       </main>
 
       {/* 하단 바 */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-orange-500 z-20">
-        <div className="max-w-2xl mx-auto px-5 py-3.5 pb-safe flex flex-col items-center">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-white">{totalCount}</span>
-            <span className="text-sm text-orange-100">개</span>
-            <span className="text-xs text-orange-200 ml-1">{totalTypes}종류</span>
-          </div>
+      <footer style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        backgroundColor: 'var(--espresso)',
+        zIndex: 20,
+        borderTop: '1px solid var(--espresso-light)',
+      }}>
+        <div style={{
+          maxWidth: '40rem', margin: '0 auto',
+          padding: '0.75rem 1.5rem',
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'center',
+          gap: '0.5rem',
+        }}>
+          <span style={{
+            fontFamily: 'var(--font-serif)',
+            fontStyle: 'italic',
+            fontSize: '2.25rem',
+            fontWeight: 600,
+            color: 'var(--cream)',
+            lineHeight: 1,
+            letterSpacing: '-0.01em',
+          }}>
+            {totalCount}
+          </span>
+          <span style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: '0.8rem',
+            color: 'var(--warm-faint)',
+            fontWeight: 300,
+          }}>
+            개
+          </span>
+          {totalTypes > 0 && (
+            <span style={{
+              fontFamily: 'var(--font-serif)',
+              fontStyle: 'italic',
+              fontSize: '0.8rem',
+              color: 'rgba(184,168,152,0.5)',
+              marginLeft: '0.25rem',
+            }}>
+              {totalTypes}종류
+            </span>
+          )}
         </div>
       </footer>
     </div>

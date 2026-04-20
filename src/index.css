@@ -1,3 +1,55 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --cream: #F5EDD6;
+  --cream-dark: #EDE0C4;
+  --espresso: #1A0D08;
+  --espresso-light: #2E1A10;
+  --terracotta: #C4622D;
+  --terracotta-light: #D97448;
+  --warm-text: #2D1F17;
+  --warm-mid: #7A5C44;
+  --warm-faint: #B8A898;
+  --paper-border: #DDD0B8;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-myeongjo: 'Nanum Myeongjo', serif;
+  --font-handwriting: 'Nanum Pen Script', cursive;
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--cream);
+  color: var(--warm-text);
+  font-family: var(--font-sans);
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes countPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.menu-item {
+  animation: fadeSlideIn 0.3s ease both;
+}
+
+.count-pop {
+  animation: countPop 0.25s ease;
+}
