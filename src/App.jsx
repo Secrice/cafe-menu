@@ -274,7 +274,7 @@ const App = () => {
                     <div
                       onClick={() => setEditingId(item.id)}
                       style={{
-                        fontSize: '1.25rem',
+                        fontSize: '1.5rem',
                         fontWeight: 400,
                         fontFamily: 'var(--font-sans)',
                         cursor: 'pointer',
@@ -341,7 +341,7 @@ const App = () => {
                         width: '2rem',
                         textAlign: 'center',
                         fontFamily: 'var(--font-serif)',
-                        fontSize: '1.1rem',
+                        fontSize: '1.4rem',
                         fontWeight: 600,
                         color: 'var(--terracotta)',
                         lineHeight: '2rem',
