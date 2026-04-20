@@ -274,9 +274,9 @@ const App = () => {
                     <div
                       onClick={() => setEditingId(item.id)}
                       style={{
-                        fontSize: '1.5rem',
+                        fontSize: '1.25rem',
                         fontWeight: 400,
-                        fontFamily: item.name ? 'var(--font-handwriting)' : 'var(--font-sans)',
+                        fontFamily: 'var(--font-sans)',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
