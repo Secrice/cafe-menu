@@ -24,6 +24,12 @@ const App = () => {
 
   // Hanko 초기화 및 세션 감지
   useEffect(() => {
+    if (import.meta.env.DEV) {
+      setUserId('dev-user');
+      setAuthReady(true);
+      return;
+    }
+
     register(hankoApi).catch(console.error);
 
     const checkSession = async () => {
