@@ -1,40 +1,87 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, X } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Plus, X, LogOut } from 'lucide-react';
+import { Hanko, register } from '@teamhanko/hanko-elements';
+import { loadUserData, saveItems, saveHistory } from './lib/supabase';
+
+const hankoApi = import.meta.env.VITE_HANKO_API_URL;
+const hanko = new Hanko(hankoApi);
+
+const SAVE_DELAY = 800;
 
 const App = () => {
-  const [items, setItems] = useState(() => {
-    try {
-      const saved = localStorage.getItem('menuItems');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [history, setHistory] = useState(() => {
-    try {
-      const saved = localStorage.getItem('menuHistory');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      return parsed.map(h => typeof h === 'string' ? { name: h, temp: null } : h);
-    } catch {
-      return [];
-    }
-  });
-
+  const [userId, setUserId] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [items, setItems] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [pendingClear, setPendingClear] = useState(false);
   const [pendingHistoryClear, setPendingHistoryClear] = useState(false);
   const [poppingId, setPoppingId] = useState(null);
   const inputRef = useRef(null);
+  const itemsSaveTimer = useRef(null);
+  const historySaveTimer = useRef(null);
 
+  // Hanko 초기화 및 세션 감지
   useEffect(() => {
-    localStorage.setItem('menuItems', JSON.stringify(items));
-  }, [items]);
+    register(hankoApi).catch(console.error);
 
+    const checkSession = async () => {
+      try {
+        const user = await hanko.getUser();
+        setUserId(user.id);
+      } catch {
+        setUserId(null);
+      } finally {
+        setAuthReady(true);
+      }
+    };
+
+    checkSession();
+
+    hanko.onSessionCreated(async () => {
+      const user = await hanko.getUser();
+      setUserId(user.id);
+    });
+
+    hanko.onSessionExpired(() => {
+      setUserId(null);
+      setItems([]);
+      setHistory([]);
+      setDataLoaded(false);
+    });
+  }, []);
+
+  // 로그인 후 데이터 로드
   useEffect(() => {
-    localStorage.setItem('menuHistory', JSON.stringify(history));
-  }, [history]);
+    if (!userId) return;
+    setDataLoaded(false);
+    loadUserData(userId).then(({ items, history }) => {
+      setItems(items);
+      setHistory(history);
+      setDataLoaded(true);
+    });
+  }, [userId]);
+
+  const scheduleSaveItems = useCallback((uid, newItems) => {
+    clearTimeout(itemsSaveTimer.current);
+    itemsSaveTimer.current = setTimeout(() => saveItems(uid, newItems), SAVE_DELAY);
+  }, []);
+
+  const scheduleSaveHistory = useCallback((uid, newHistory) => {
+    clearTimeout(historySaveTimer.current);
+    historySaveTimer.current = setTimeout(() => saveHistory(uid, newHistory), SAVE_DELAY);
+  }, []);
+
+  const updateItems = (newItems) => {
+    setItems(newItems);
+    if (userId && dataLoaded) scheduleSaveItems(userId, newItems);
+  };
+
+  const updateHistory = (newHistory) => {
+    setHistory(newHistory);
+    if (userId && dataLoaded) scheduleSaveHistory(userId, newHistory);
+  };
 
   useEffect(() => {
     if (editingId && inputRef.current) {
@@ -45,7 +92,7 @@ const App = () => {
 
   const addItem = () => {
     const newItem = { id: crypto.randomUUID(), name: '', count: 1, temp: null };
-    setItems([...items, newItem]);
+    updateItems([...items, newItem]);
     setEditingId(newItem.id);
   };
 
@@ -53,36 +100,35 @@ const App = () => {
     const existingItem = items.find(item => item.name === name && item.temp === temp);
     if (existingItem) {
       triggerPop(existingItem.id);
-      updateCount(existingItem.id, 1);
+      updateItems(items.map(item =>
+        item.id === existingItem.id ? { ...item, count: Math.max(1, item.count + 1) } : item
+      ));
       return;
     }
-    setItems([...items, { id: crypto.randomUUID(), name, count: 1, temp }]);
+    updateItems([...items, { id: crypto.randomUUID(), name, count: 1, temp }]);
   };
 
   const setTempForItem = (id, value) => {
-    setItems(items.map(i => i.id === id ? { ...i, temp: i.temp === value ? null : value } : i));
+    updateItems(items.map(i => i.id === id ? { ...i, temp: i.temp === value ? null : value } : i));
   };
 
   const removeFromHistory = (e, index) => {
     e.stopPropagation();
-    setHistory(prev => prev.filter((_, i) => i !== index));
+    updateHistory(history.filter((_, i) => i !== index));
   };
 
   const finishEditing = (id, newName) => {
     const trimmedName = newName.trim();
     const item = items.find(i => i.id === id);
     if (!trimmedName) {
-      if (item && !item.name) setItems(items.filter(i => i.id !== id));
+      if (item && !item.name) updateItems(items.filter(i => i.id !== id));
       setEditingId(null);
       return;
     }
-    setItems(items.map(i => (i.id === id ? { ...i, name: trimmedName } : i)));
+    updateItems(items.map(i => (i.id === id ? { ...i, name: trimmedName } : i)));
     setEditingId(null);
     const temp = item?.temp ?? null;
-    setHistory(prev => {
-      const filtered = prev.filter(h => !(h.name === trimmedName && h.temp === temp));
-      return [{ name: trimmedName, temp }, ...filtered].slice(0, 15);
-    });
+    updateHistory([{ name: trimmedName, temp }, ...history.filter(h => !(h.name === trimmedName && h.temp === temp))].slice(0, 15));
   };
 
   const triggerPop = (id) => {
@@ -92,18 +138,17 @@ const App = () => {
 
   const updateCount = (id, delta) => {
     triggerPop(id);
-    setItems(items.map(item =>
+    updateItems(items.map(item =>
       item.id === id ? { ...item, count: Math.max(1, item.count + delta) } : item
     ));
   };
 
-  const removeItem = id => setItems(items.filter(item => item.id !== id));
+  const removeItem = id => updateItems(items.filter(item => item.id !== id));
 
   const handleClearClick = () => {
     if (pendingClear) {
-      setItems([]);
+      updateItems([]);
       setPendingClear(false);
-      window.location.reload();
     } else {
       setPendingClear(true);
       setTimeout(() => setPendingClear(false), 3000);
@@ -112,7 +157,7 @@ const App = () => {
 
   const handleHistoryClearClick = () => {
     if (pendingHistoryClear) {
-      setHistory([]);
+      updateHistory([]);
       setPendingHistoryClear(false);
     } else {
       setPendingHistoryClear(true);
@@ -123,10 +168,54 @@ const App = () => {
   const totalTypes = items.length;
   const totalCount = items.reduce((sum, item) => sum + item.count, 0);
 
+  if (!authReady) {
+    return (
+      <div style={{
+        minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: 'var(--cream)',
+      }}>
+        <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--warm-faint)', fontSize: '1rem' }}>
+          loading…
+        </span>
+      </div>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <div style={{
+        minHeight: '100svh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: 'var(--cream)', gap: '2rem',
+        padding: '2rem',
+      }}>
+        <h1 style={{
+          fontFamily: 'var(--font-myeongjo)', fontSize: '1.5rem', fontWeight: 700,
+          color: 'var(--espresso)', letterSpacing: '0.04em',
+        }}>
+          메뉴 리스트
+        </h1>
+        <hanko-auth />
+      </div>
+    );
+  }
+
+  if (!dataLoaded) {
+    return (
+      <div style={{
+        minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: 'var(--cream)',
+      }}>
+        <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--warm-faint)', fontSize: '1rem' }}>
+          메뉴 불러오는 중…
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100svh', backgroundColor: 'var(--cream)', paddingBottom: '7rem' }}>
 
-      {/* 헤더 */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 10,
         backgroundColor: 'var(--espresso)',
@@ -148,35 +237,51 @@ const App = () => {
         }}>
           메뉴 리스트
         </h1>
-        <button
-          onClick={handleClearClick}
-          style={{
-            fontFamily: 'var(--font-sans)',
-            fontSize: '0.7rem',
-            fontWeight: 500,
-            letterSpacing: '0.08em',
-            padding: '0.35rem 0.75rem',
-            borderRadius: '2rem',
-            border: pendingClear ? '1px solid #ef4444' : '1px solid rgba(245,237,214,0.2)',
-            color: pendingClear ? '#fca5a5' : 'var(--warm-faint)',
-            backgroundColor: pendingClear ? 'rgba(239,68,68,0.12)' : 'transparent',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {pendingClear ? '한 번 더 누르면 초기화' : '전체 초기화'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button
+            onClick={handleClearClick}
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: '0.7rem',
+              fontWeight: 500,
+              letterSpacing: '0.08em',
+              padding: '0.35rem 0.75rem',
+              borderRadius: '2rem',
+              border: pendingClear ? '1px solid #ef4444' : '1px solid rgba(245,237,214,0.2)',
+              color: pendingClear ? '#fca5a5' : 'var(--warm-faint)',
+              backgroundColor: pendingClear ? 'rgba(239,68,68,0.12)' : 'transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {pendingClear ? '한 번 더 누르면 초기화' : '전체 초기화'}
+          </button>
+          <button
+            onClick={() => hanko.logout()}
+            title="로그아웃"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '2rem', height: '2rem',
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'rgba(184,168,152,0.4)',
+              borderRadius: '0.375rem',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--warm-faint)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'rgba(184,168,152,0.4)'}
+          >
+            <LogOut size={14} />
+          </button>
+        </div>
       </header>
 
       <main style={{ maxWidth: '40rem', margin: '0 auto' }}>
 
-        {/* 구분선 — 항목 있을 때만 */}
         {items.length > 0 && (
           <div style={{ borderBottom: '1px solid var(--paper-border)' }} />
         )}
 
-        {/* 아이템 리스트 */}
         {items.length === 0 ? (
           <div style={{
             padding: '5rem 1.25rem',
@@ -206,7 +311,6 @@ const App = () => {
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--cream-dark)'}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                {/* 순번 */}
                 <span style={{
                   fontFamily: 'var(--font-serif)',
                   fontStyle: 'italic',
@@ -219,7 +323,6 @@ const App = () => {
                   {i + 1}
                 </span>
 
-                {/* 이름 */}
                 <div style={{ flex: 1, minWidth: 0, marginRight: '1rem' }}>
                   {editingId === item.id ? (
                     <div>
@@ -307,7 +410,6 @@ const App = () => {
                   )}
                 </div>
 
-                {/* 수량 조절 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
                   <div style={{
                     display: 'flex',
@@ -324,9 +426,7 @@ const App = () => {
                         width: '2rem', height: '2rem',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: 'none', border: 'none', cursor: 'pointer',
-                        color: 'var(--warm-mid)',
-                        fontSize: '1rem',
-                        fontWeight: 300,
+                        color: 'var(--warm-mid)', fontSize: '1rem', fontWeight: 300,
                         transition: 'background-color 0.1s',
                       }}
                       onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--cream-dark)'}
@@ -355,9 +455,7 @@ const App = () => {
                         width: '2rem', height: '2rem',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: 'none', border: 'none', cursor: 'pointer',
-                        color: 'var(--warm-mid)',
-                        fontSize: '1rem',
-                        fontWeight: 300,
+                        color: 'var(--warm-mid)', fontSize: '1rem', fontWeight: 300,
                         transition: 'background-color 0.1s',
                       }}
                       onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--cream-dark)'}
@@ -389,7 +487,6 @@ const App = () => {
           </ul>
         )}
 
-        {/* 새 메뉴 추가 버튼 */}
         <div style={{ padding: '1rem 1.25rem' }}>
           <button
             onClick={addItem}
@@ -423,13 +520,9 @@ const App = () => {
           </button>
         </div>
 
-        {/* 히스토리 */}
         {history.length > 0 && (
           <div style={{ padding: '0 1.25rem 3rem' }}>
-            <div style={{
-              borderTop: '1px solid var(--paper-border)',
-              paddingTop: '1rem',
-            }}>
+            <div style={{ borderTop: '1px solid var(--paper-border)', paddingTop: '1rem' }}>
               <div style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 marginBottom: '0.75rem',
@@ -529,7 +622,6 @@ const App = () => {
         )}
       </main>
 
-      {/* 하단 바 */}
       <footer style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         backgroundColor: 'var(--espresso)',
