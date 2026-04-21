@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, X, LogOut, Star, LogIn } from 'lucide-react';
 import { Hanko, register } from '@teamhanko/hanko-elements';
-import { loadUserData, saveItems, saveHistory, saveFavorites } from './lib/supabase';
+import { loadUserData, saveHistory, saveFavorites } from './lib/supabase';
+
+const SAVE_DELAY = 800;
 
 const hankoApi = import.meta.env.VITE_HANKO_API_URL;
 const hanko = new Hanko(hankoApi);
-
-const SAVE_DELAY = 800;
 
 const App = () => {
   const [userId, setUserId] = useState(null);
   const [items, setItems] = useState([]);
   const [history, setHistory] = useState([]);
   const [favorites, setFavorites] = useState([]);
-  const [dataLoaded, setDataLoaded] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [pendingClear, setPendingClear] = useState(false);
   const [pendingHistoryClear, setPendingHistoryClear] = useState(false);
@@ -22,13 +22,13 @@ const App = () => {
   const [showLogin, setShowLogin] = useState(false);
   const inputRef = useRef(null);
   const favInputRef = useRef(null);
-  const itemsSaveTimer = useRef(null);
   const historySaveTimer = useRef(null);
   const favoritesSaveTimer = useRef(null);
 
   useEffect(() => {
     if (import.meta.env.DEV) {
       setUserId('dev-user');
+      setDataLoaded(true);
       return;
     }
 
@@ -36,7 +36,7 @@ const App = () => {
 
     hanko.getUser()
       .then(user => setUserId(user.id))
-      .catch(() => {});
+      .catch(() => setDataLoaded(true));
 
     hanko.onSessionCreated(async () => {
       const user = await hanko.getUser();
@@ -57,22 +57,15 @@ const App = () => {
     hanko.onUserLoggedOut(resetState);
   }, []);
 
-  // 로그인 후 Supabase에서 데이터 로드
   useEffect(() => {
     if (!userId || userId === 'dev-user') return;
     setDataLoaded(false);
-    loadUserData(userId).then(({ items, history, favorites }) => {
-      setItems(items);
+    loadUserData(userId).then(({ history, favorites }) => {
       setHistory(history);
       setFavorites(favorites);
       setDataLoaded(true);
     });
   }, [userId]);
-
-  const scheduleSaveItems = useCallback((uid, newItems) => {
-    clearTimeout(itemsSaveTimer.current);
-    itemsSaveTimer.current = setTimeout(() => saveItems(uid, newItems), SAVE_DELAY);
-  }, []);
 
   const scheduleSaveHistory = useCallback((uid, newHistory) => {
     clearTimeout(historySaveTimer.current);
@@ -84,16 +77,11 @@ const App = () => {
     favoritesSaveTimer.current = setTimeout(() => saveFavorites(uid, newFavs), SAVE_DELAY);
   }, []);
 
-  const updateItems = (newItems) => {
-    setItems(newItems);
-    if (userId && dataLoaded) scheduleSaveItems(userId, newItems);
-  };
-
+  const updateItems = (newItems) => setItems(newItems);
   const updateHistory = (newHistory) => {
     setHistory(newHistory);
     if (userId && dataLoaded) scheduleSaveHistory(userId, newHistory);
   };
-
   const updateFavorites = (newFavs) => {
     setFavorites(newFavs);
     if (userId && dataLoaded) scheduleSaveFavorites(userId, newFavs);
@@ -212,9 +200,6 @@ const App = () => {
     }
   };
 
-  const totalTypes = items.length;
-  const totalCount = items.reduce((sum, item) => sum + item.count, 0);
-
   if (!dataLoaded) {
     return (
       <div style={{
@@ -222,11 +207,14 @@ const App = () => {
         backgroundColor: 'var(--cream)',
       }}>
         <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--warm-faint)', fontSize: '1rem' }}>
-          메뉴 불러오는 중…
+          불러오는 중…
         </span>
       </div>
     );
   }
+
+  const totalTypes = items.length;
+  const totalCount = items.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <div style={{ minHeight: '100svh', backgroundColor: 'var(--cream)', paddingBottom: '7rem' }}>
