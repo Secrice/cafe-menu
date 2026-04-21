@@ -23,6 +23,6 @@ Single-page React app (Vite + Tailwind CSS) for collecting and managing a menu l
 - Scrollable list of menu items with inline name editing (click to edit, blur/Enter to confirm) and ± count controls
 - Fixed footer showing total types/count and a "clear all" button
 
-**Deployment:** Netlify — `npm run build` outputs to `dist/`, with a catch-all redirect for SPA routing (`netlify.toml`).
+**Deployment:** Vercel — `npm run build` outputs to `dist/`. GitHub 푸시 시 Vercel이 자동 배포.
 
 The UI is in Korean.

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, X, LogOut } from 'lucide-react';
+import { Plus, X, LogOut, Star } from 'lucide-react';
 import { Hanko, register } from '@teamhanko/hanko-elements';
-import { loadUserData, saveItems, saveHistory } from './lib/supabase';
+import { loadUserData, saveItems, saveHistory, saveFavorites } from './lib/supabase';
 
 const hankoApi = import.meta.env.VITE_HANKO_API_URL;
 const hanko = new Hanko(hankoApi);
@@ -13,14 +13,18 @@ const App = () => {
   const [authReady, setAuthReady] = useState(false);
   const [items, setItems] = useState([]);
   const [history, setHistory] = useState([]);
+  const [favorites, setFavorites] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [pendingClear, setPendingClear] = useState(false);
   const [pendingHistoryClear, setPendingHistoryClear] = useState(false);
   const [poppingId, setPoppingId] = useState(null);
+  const [favInput, setFavInput] = useState(null);
   const inputRef = useRef(null);
+  const favInputRef = useRef(null);
   const itemsSaveTimer = useRef(null);
   const historySaveTimer = useRef(null);
+  const favoritesSaveTimer = useRef(null);
 
   // Hanko 초기화 및 세션 감지
   useEffect(() => {
@@ -54,6 +58,8 @@ const App = () => {
       setUserId(null);
       setItems([]);
       setHistory([]);
+      setFavorites([]);
+      setFavInput(null);
       setDataLoaded(false);
     };
 
@@ -65,9 +71,10 @@ const App = () => {
   useEffect(() => {
     if (!userId) return;
     setDataLoaded(false);
-    loadUserData(userId).then(({ items, history }) => {
+    loadUserData(userId).then(({ items, history, favorites }) => {
       setItems(items);
       setHistory(history);
+      setFavorites(favorites);
       setDataLoaded(true);
     });
   }, [userId]);
@@ -82,6 +89,11 @@ const App = () => {
     historySaveTimer.current = setTimeout(() => saveHistory(uid, newHistory), SAVE_DELAY);
   }, []);
 
+  const scheduleSaveFavorites = useCallback((uid, newFavs) => {
+    clearTimeout(favoritesSaveTimer.current);
+    favoritesSaveTimer.current = setTimeout(() => saveFavorites(uid, newFavs), SAVE_DELAY);
+  }, []);
+
   const updateItems = (newItems) => {
     setItems(newItems);
     if (userId && dataLoaded) scheduleSaveItems(userId, newItems);
@@ -92,12 +104,49 @@ const App = () => {
     if (userId && dataLoaded) scheduleSaveHistory(userId, newHistory);
   };
 
+  const updateFavorites = (newFavs) => {
+    setFavorites(newFavs);
+    if (userId && dataLoaded) scheduleSaveFavorites(userId, newFavs);
+  };
+
   useEffect(() => {
     if (editingId && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
   }, [editingId]);
+
+  useEffect(() => {
+    if (favInput !== null && favInputRef.current) {
+      favInputRef.current.focus();
+      favInputRef.current.select();
+    }
+  }, [favInput]);
+
+  const generateFavLabel = () =>
+    items.map(it => it.name + (it.temp ? ` ${it.temp}` : '')).join(', ').slice(0, 40);
+
+  const confirmSaveFavorite = (label) => {
+    const trimmed = label.trim();
+    if (!trimmed) { setFavInput(null); return; }
+    const newFav = {
+      id: crypto.randomUUID(),
+      label: trimmed,
+      items: items.map(({ name, count, temp }) => ({ name, count, temp })),
+    };
+    updateFavorites([...favorites, newFav]);
+    setFavInput(null);
+  };
+
+  const deleteFavorite = (e, id) => {
+    e.stopPropagation();
+    updateFavorites(favorites.filter(f => f.id !== id));
+  };
+
+
+  const loadFavorite = (fav) => {
+    updateItems(fav.items.map(it => ({ ...it, id: crypto.randomUUID() })));
+  };
 
   const addItem = () => {
     const newItem = { id: crypto.randomUUID(), name: '', count: 1, temp: null };
@@ -527,7 +576,180 @@ const App = () => {
             <Plus size={15} />
             새 메뉴 추가
           </button>
+
+          {items.length > 0 && (
+            <div style={{ marginTop: '0.625rem' }}>
+              {favInput === null ? (
+                <button
+                  onClick={() => setFavInput(generateFavLabel())}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                    background: 'none',
+                    border: '1px solid transparent',
+                    borderRadius: '0.75rem',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '0.775rem',
+                    fontWeight: 400,
+                    color: 'var(--warm-faint)',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = 'rgba(196,98,45,0.25)';
+                    e.currentTarget.style.color = 'var(--terracotta)';
+                    e.currentTarget.style.backgroundColor = 'rgba(196,98,45,0.04)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--warm-faint)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <Star size={12} />
+                  즐겨찾기로 저장
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    ref={favInputRef}
+                    defaultValue={favInput}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') confirmSaveFavorite(favInputRef.current?.value ?? '');
+                      if (e.key === 'Escape') setFavInput(null);
+                    }}
+                    placeholder="즐겨찾기 이름"
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      borderBottom: '1.5px solid var(--terracotta)',
+                      outline: 'none',
+                      padding: '0.25rem 0',
+                      fontSize: '0.875rem',
+                      fontFamily: 'var(--font-sans)',
+                      backgroundColor: 'transparent',
+                      color: 'var(--warm-text)',
+                    }}
+                  />
+                  <button
+                    onClick={() => confirmSaveFavorite(favInputRef.current?.value ?? '')}
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '2rem',
+                      border: '1px solid var(--terracotta)',
+                      backgroundColor: 'var(--terracotta)',
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      fontFamily: 'var(--font-sans)',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    저장
+                  </button>
+                  <button
+                    onClick={() => setFavInput(null)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: '1.5rem', height: '1.5rem',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--warm-faint)',
+                      borderRadius: '0.375rem',
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
+        {favorites.length > 0 && (
+          <div style={{ padding: '0 1.25rem' }}>
+            <div style={{ borderTop: '1px solid var(--paper-border)', paddingTop: '1rem', marginBottom: '1rem' }}>
+              <h2 style={{
+                fontFamily: 'var(--font-myeongjo)',
+                fontSize: '0.85rem',
+                color: 'var(--warm-faint)',
+                margin: '0 0 0.75rem 0',
+                fontWeight: 400,
+                display: 'flex', alignItems: 'center', gap: '0.35rem',
+              }}>
+                <Star size={12} fill="currentColor" />
+                즐겨찾기
+              </h2>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                {favorites.map(fav => (
+                  <div
+                    key={fav.id}
+                    onClick={() => loadFavorite(fav)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.5rem',
+                      border: '1px solid var(--paper-border)',
+                      borderRadius: '0.75rem',
+                      backgroundColor: 'rgba(255,255,255,0.7)',
+                      padding: '0.5rem 0.5rem 0.5rem 0.85rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      maxWidth: '100%',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = 'rgba(196,98,45,0.35)';
+                      e.currentTarget.style.backgroundColor = 'rgba(196,98,45,0.06)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = 'var(--paper-border)';
+                      e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.7)';
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: '0.825rem',
+                        fontWeight: 500,
+                        color: 'var(--warm-text)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}>
+                        {fav.label}
+                      </div>
+                      <div style={{
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: '0.7rem',
+                        color: 'var(--warm-faint)',
+                        marginTop: '0.1rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}>
+                        {fav.items.map(it => `${it.name}${it.temp ? ` ${it.temp}` : ''} ×${it.count}`).join(' · ')}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => deleteFavorite(e, fav.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0,
+                        width: '1.5rem', height: '1.5rem',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--warm-faint)',
+                        borderRadius: '0.375rem',
+                        transition: 'color 0.15s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--warm-faint)'}
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {history.length > 0 && (
           <div style={{ padding: '0 1.25rem 3rem' }}>
