@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, X, LogOut, Star } from 'lucide-react';
+import { Plus, X, LogOut, Star, LogIn } from 'lucide-react';
 import { Hanko, register } from '@teamhanko/hanko-elements';
 import { loadUserData, saveItems, saveHistory, saveFavorites } from './lib/supabase';
 
@@ -10,48 +10,38 @@ const SAVE_DELAY = 800;
 
 const App = () => {
   const [userId, setUserId] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
   const [items, setItems] = useState([]);
   const [history, setHistory] = useState([]);
   const [favorites, setFavorites] = useState([]);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [pendingClear, setPendingClear] = useState(false);
   const [pendingHistoryClear, setPendingHistoryClear] = useState(false);
   const [poppingId, setPoppingId] = useState(null);
   const [favInput, setFavInput] = useState(null);
+  const [showLogin, setShowLogin] = useState(false);
   const inputRef = useRef(null);
   const favInputRef = useRef(null);
   const itemsSaveTimer = useRef(null);
   const historySaveTimer = useRef(null);
   const favoritesSaveTimer = useRef(null);
 
-  // Hanko 초기화 및 세션 감지
   useEffect(() => {
     if (import.meta.env.DEV) {
       setUserId('dev-user');
-      setAuthReady(true);
       return;
     }
 
     register(hankoApi).catch(console.error);
 
-    const checkSession = async () => {
-      try {
-        const user = await hanko.getUser();
-        setUserId(user.id);
-      } catch {
-        setUserId(null);
-      } finally {
-        setAuthReady(true);
-      }
-    };
-
-    checkSession();
+    hanko.getUser()
+      .then(user => setUserId(user.id))
+      .catch(() => {});
 
     hanko.onSessionCreated(async () => {
       const user = await hanko.getUser();
       setUserId(user.id);
+      setShowLogin(false);
     });
 
     const resetState = () => {
@@ -60,16 +50,16 @@ const App = () => {
       setHistory([]);
       setFavorites([]);
       setFavInput(null);
-      setDataLoaded(false);
+      setDataLoaded(true);
     };
 
     hanko.onSessionExpired(resetState);
     hanko.onUserLoggedOut(resetState);
   }, []);
 
-  // 로그인 후 데이터 로드
+  // 로그인 후 Supabase에서 데이터 로드
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || userId === 'dev-user') return;
     setDataLoaded(false);
     loadUserData(userId).then(({ items, history, favorites }) => {
       setItems(items);
@@ -142,7 +132,6 @@ const App = () => {
     e.stopPropagation();
     updateFavorites(favorites.filter(f => f.id !== id));
   };
-
 
   const loadFavorite = (fav) => {
     updateItems(fav.items.map(it => ({ ...it, id: crypto.randomUUID() })));
@@ -226,38 +215,6 @@ const App = () => {
   const totalTypes = items.length;
   const totalCount = items.reduce((sum, item) => sum + item.count, 0);
 
-  if (!authReady) {
-    return (
-      <div style={{
-        minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: 'var(--cream)',
-      }}>
-        <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--warm-faint)', fontSize: '1rem' }}>
-          loading…
-        </span>
-      </div>
-    );
-  }
-
-  if (!userId) {
-    return (
-      <div style={{
-        minHeight: '100svh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        backgroundColor: 'var(--cream)', gap: '2rem',
-        padding: '2rem',
-      }}>
-        <h1 style={{
-          fontFamily: 'var(--font-myeongjo)', fontSize: '1.5rem', fontWeight: 700,
-          color: 'var(--espresso)', letterSpacing: '0.04em',
-        }}>
-          메뉴 리스트
-        </h1>
-        <hanko-auth />
-      </div>
-    );
-  }
-
   if (!dataLoaded) {
     return (
       <div style={{
@@ -273,6 +230,45 @@ const App = () => {
 
   return (
     <div style={{ minHeight: '100svh', backgroundColor: 'var(--cream)', paddingBottom: '7rem' }}>
+
+      {showLogin && (
+        <div
+          onClick={() => setShowLogin(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            backgroundColor: 'rgba(40,25,15,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1.5rem',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: 'var(--cream)',
+              borderRadius: '1rem',
+              padding: '1.5rem',
+              width: '100%',
+              maxWidth: '22rem',
+              position: 'relative',
+            }}
+          >
+            <button
+              onClick={() => setShowLogin(false)}
+              style={{
+                position: 'absolute', top: '0.75rem', right: '0.75rem',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '1.75rem', height: '1.75rem',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--warm-faint)',
+                borderRadius: '0.375rem',
+              }}
+            >
+              <X size={16} />
+            </button>
+            <hanko-auth />
+          </div>
+        </div>
+      )}
 
       <header style={{
         position: 'sticky', top: 0, zIndex: 10,
@@ -315,22 +311,41 @@ const App = () => {
           >
             {pendingClear ? '한 번 더 누르면 초기화' : '전체 초기화'}
           </button>
-          <button
-            onClick={() => hanko.logout()}
-            title="로그아웃"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '2rem', height: '2rem',
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'rgba(184,168,152,0.4)',
-              borderRadius: '0.375rem',
-              transition: 'color 0.15s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--warm-faint)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'rgba(184,168,152,0.4)'}
-          >
-            <LogOut size={14} />
-          </button>
+          {userId ? (
+            <button
+              onClick={() => hanko.logout()}
+              title="로그아웃"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '2rem', height: '2rem',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'rgba(184,168,152,0.4)',
+                borderRadius: '0.375rem',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--warm-faint)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(184,168,152,0.4)'}
+            >
+              <LogOut size={14} />
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowLogin(true)}
+              title="로그인"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '2rem', height: '2rem',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'rgba(184,168,152,0.4)',
+                borderRadius: '0.375rem',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--warm-faint)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(184,168,152,0.4)'}
+            >
+              <LogIn size={14} />
+            </button>
+          )}
         </div>
       </header>
 
