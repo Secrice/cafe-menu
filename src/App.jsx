@@ -502,9 +502,6 @@ const App = () => {
                         color: 'var(--warm-mid)', fontSize: '1rem', fontWeight: 300,
                         transition: 'background-color 0.1s',
                       }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--cream-dark)'}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                      onTouchEnd={e => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       −
                     </button>
@@ -532,9 +529,6 @@ const App = () => {
                         color: 'var(--warm-mid)', fontSize: '1rem', fontWeight: 300,
                         transition: 'background-color 0.1s',
                       }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--cream-dark)'}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                      onTouchEnd={e => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       +
                     </button>
