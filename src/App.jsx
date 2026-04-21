@@ -1,91 +1,34 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, X, LogOut, Star, LogIn } from 'lucide-react';
-import { Hanko, register } from '@teamhanko/hanko-elements';
-import { loadUserData, saveHistory, saveFavorites } from './lib/supabase';
-
-const SAVE_DELAY = 800;
-
-const hankoApi = import.meta.env.VITE_HANKO_API_URL;
-const hanko = new Hanko(hankoApi);
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, X, Star } from 'lucide-react';
 
 const App = () => {
-  const [userId, setUserId] = useState(null);
   const [items, setItems] = useState([]);
   const [history, setHistory] = useState([]);
   const [favorites, setFavorites] = useState([]);
-  const [dataLoaded, setDataLoaded] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [pendingClear, setPendingClear] = useState(false);
   const [pendingHistoryClear, setPendingHistoryClear] = useState(false);
   const [poppingId, setPoppingId] = useState(null);
   const [favInput, setFavInput] = useState(null);
-  const [showLogin, setShowLogin] = useState(false);
   const inputRef = useRef(null);
   const favInputRef = useRef(null);
-  const historySaveTimer = useRef(null);
-  const favoritesSaveTimer = useRef(null);
 
   useEffect(() => {
-    if (import.meta.env.DEV) {
-      setUserId('dev-user');
-      setDataLoaded(true);
-      return;
-    }
-
-    register(hankoApi).catch(console.error);
-
-    hanko.getUser()
-      .then(user => setUserId(user.id))
-      .catch(() => setDataLoaded(true));
-
-    hanko.onSessionCreated(async () => {
-      const user = await hanko.getUser();
-      setUserId(user.id);
-      setShowLogin(false);
-    });
-
-    const resetState = () => {
-      setUserId(null);
-      setItems([]);
-      setHistory([]);
-      setFavorites([]);
-      setFavInput(null);
-      setDataLoaded(true);
-    };
-
-    hanko.onSessionExpired(resetState);
-    hanko.onUserLoggedOut(resetState);
+    try {
+      const h = localStorage.getItem('menuHistory');
+      const f = localStorage.getItem('menuFavorites');
+      if (h) setHistory(JSON.parse(h));
+      if (f) setFavorites(JSON.parse(f));
+    } catch {}
   }, []);
 
   useEffect(() => {
-    if (!userId || userId === 'dev-user') return;
-    setDataLoaded(false);
-    loadUserData(userId).then(({ history, favorites }) => {
-      setHistory(history);
-      setFavorites(favorites);
-      setDataLoaded(true);
-    });
-  }, [userId]);
+    localStorage.setItem('menuHistory', JSON.stringify(history));
+  }, [history]);
 
-  const scheduleSaveHistory = useCallback((uid, newHistory) => {
-    clearTimeout(historySaveTimer.current);
-    historySaveTimer.current = setTimeout(() => saveHistory(uid, newHistory), SAVE_DELAY);
-  }, []);
-
-  const scheduleSaveFavorites = useCallback((uid, newFavs) => {
-    clearTimeout(favoritesSaveTimer.current);
-    favoritesSaveTimer.current = setTimeout(() => saveFavorites(uid, newFavs), SAVE_DELAY);
-  }, []);
-
-  const updateItems = (newItems) => setItems(newItems);
-  const updateHistory = (newHistory) => {
-    setHistory(newHistory);
-    if (userId && dataLoaded) scheduleSaveHistory(userId, newHistory);
-  };
-  const updateFavorites = (newFavs) => {
-    setFavorites(newFavs);
-    if (userId && dataLoaded) scheduleSaveFavorites(userId, newFavs);
-  };
+  useEffect(() => {
+    localStorage.setItem('menuFavorites', JSON.stringify(favorites));
+  }, [favorites]);
 
   useEffect(() => {
     if (editingId && inputRef.current) {
@@ -100,6 +43,10 @@ const App = () => {
       favInputRef.current.select();
     }
   }, [favInput]);
+
+  const updateItems = (newItems) => setItems(newItems);
+  const updateHistory = (newHistory) => setHistory(newHistory);
+  const updateFavorites = (newFavs) => setFavorites(newFavs);
 
   const generateFavLabel = () =>
     items.map(it => it.name + (it.temp ? ` ${it.temp}` : '')).join(', ').slice(0, 40);
@@ -200,63 +147,11 @@ const App = () => {
     }
   };
 
-  if (!dataLoaded) {
-    return (
-      <div style={{
-        minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: 'var(--cream)',
-      }}>
-        <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--warm-faint)', fontSize: '1rem' }}>
-          불러오는 중…
-        </span>
-      </div>
-    );
-  }
-
   const totalTypes = items.length;
   const totalCount = items.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <div style={{ minHeight: '100svh', backgroundColor: 'var(--cream)', paddingBottom: '7rem' }}>
-
-      {showLogin && (
-        <div
-          onClick={() => setShowLogin(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 100,
-            backgroundColor: 'rgba(40,25,15,0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '1.5rem',
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              backgroundColor: 'var(--cream)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              width: '100%',
-              maxWidth: '22rem',
-              position: 'relative',
-            }}
-          >
-            <button
-              onClick={() => setShowLogin(false)}
-              style={{
-                position: 'absolute', top: '0.75rem', right: '0.75rem',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: '1.75rem', height: '1.75rem',
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--warm-faint)',
-                borderRadius: '0.375rem',
-              }}
-            >
-              <X size={16} />
-            </button>
-            <hanko-auth />
-          </div>
-        </div>
-      )}
 
       <header style={{
         position: 'sticky', top: 0, zIndex: 10,
@@ -279,62 +174,25 @@ const App = () => {
         }}>
           메뉴 리스트
         </h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            onClick={handleClearClick}
-            style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: '0.7rem',
-              fontWeight: 500,
-              letterSpacing: '0.08em',
-              padding: '0.35rem 0.75rem',
-              borderRadius: '2rem',
-              border: pendingClear ? '1px solid #ef4444' : '1px solid rgba(245,237,214,0.2)',
-              color: pendingClear ? '#fca5a5' : 'var(--warm-faint)',
-              backgroundColor: pendingClear ? 'rgba(239,68,68,0.12)' : 'transparent',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {pendingClear ? '한 번 더 누르면 초기화' : '전체 초기화'}
-          </button>
-          {userId ? (
-            <button
-              onClick={() => hanko.logout()}
-              title="로그아웃"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: '2rem', height: '2rem',
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'rgba(184,168,152,0.4)',
-                borderRadius: '0.375rem',
-                transition: 'color 0.15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--warm-faint)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'rgba(184,168,152,0.4)'}
-            >
-              <LogOut size={14} />
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowLogin(true)}
-              title="로그인"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: '2rem', height: '2rem',
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'rgba(184,168,152,0.4)',
-                borderRadius: '0.375rem',
-                transition: 'color 0.15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--warm-faint)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'rgba(184,168,152,0.4)'}
-            >
-              <LogIn size={14} />
-            </button>
-          )}
-        </div>
+        <button
+          onClick={handleClearClick}
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: '0.7rem',
+            fontWeight: 500,
+            letterSpacing: '0.08em',
+            padding: '0.35rem 0.75rem',
+            borderRadius: '2rem',
+            border: pendingClear ? '1px solid #ef4444' : '1px solid rgba(245,237,214,0.2)',
+            color: pendingClear ? '#fca5a5' : 'var(--warm-faint)',
+            backgroundColor: pendingClear ? 'rgba(239,68,68,0.12)' : 'transparent',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {pendingClear ? '한 번 더 누르면 초기화' : '전체 초기화'}
+        </button>
       </header>
 
       <main style={{ maxWidth: '40rem', margin: '0 auto' }}>
