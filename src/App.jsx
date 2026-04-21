@@ -44,12 +44,15 @@ const App = () => {
       setUserId(user.id);
     });
 
-    hanko.onSessionExpired(() => {
+    const resetState = () => {
       setUserId(null);
       setItems([]);
       setHistory([]);
       setDataLoaded(false);
-    });
+    };
+
+    hanko.onSessionExpired(resetState);
+    hanko.onUserLoggedOut(resetState);
   }, []);
 
   // 로그인 후 데이터 로드
