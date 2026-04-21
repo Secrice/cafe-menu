@@ -504,6 +504,7 @@ const App = () => {
                       }}
                       onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--cream-dark)'}
                       onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                      onTouchEnd={e => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       −
                     </button>
@@ -533,6 +534,7 @@ const App = () => {
                       }}
                       onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--cream-dark)'}
                       onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                      onTouchEnd={e => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       +
                     </button>
@@ -740,7 +742,11 @@ const App = () => {
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                       }}>
-                        {fav.items.map(it => `${it.name}${it.temp ? ` ${it.temp}` : ''} ×${it.count}`).join(' · ')}
+                        {(() => {
+                          const parts = fav.items.slice(0, 2).map(it => `${it.name}${it.temp ? ` ${it.temp}` : ''} ×${it.count}`);
+                          const extra = fav.items.length - 2;
+                          return extra > 0 ? `${parts.join(' · ')} 외 ${extra}개` : parts.join(' · ');
+                        })()}
                       </div>
                     </div>
                     <button
