@@ -275,4 +275,4 @@ GitHub에 push하면 Vercel이 자동으로 새 버전을 배포합니다.
 ## 실제 완성된 앱
 
 - GitHub: https://github.com/Secrice/cafe-menu
-- 배포 URL: https://menu-select.vercel.app
+- 배포 URL: https://menu--list.vercel.app

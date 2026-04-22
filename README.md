@@ -34,6 +34,6 @@ npm run build
 
 Vercel을 통해 배포됩니다. `main` 브랜치에 푸시하면 자동으로 배포됩니다.
 
-**바로 사용하기:** [https://menu-select.vercel.app](https://menu-select.vercel.app)
+**바로 사용하기:** [https://menu--list.vercel.app](https://menu--list.vercel.app)
 
 별도 설치 없이 위 링크에서 바로 사용할 수 있습니다.
